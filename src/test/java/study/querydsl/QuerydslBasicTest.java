@@ -13,6 +13,8 @@ import study.querydsl.entity.Team;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 
+import static study.querydsl.entity.QMember.*;
+
 @SpringBootTest
 @Transactional
 public class QuerydslBasicTest {
@@ -20,9 +22,13 @@ public class QuerydslBasicTest {
     @PersistenceContext
     EntityManager em;
 
+    JPAQueryFactory queryFactory;
+
 
     @BeforeEach
     public void before() {
+
+        queryFactory = new JPAQueryFactory(em); // Querydsl 사용시 사용하는 객체 지역변수로 생성해도 동시성관리를 해준다 안전함
 
         Team teamA = new Team("teamA");
         Team teamB = new Team("teamB");
@@ -59,13 +65,11 @@ public class QuerydslBasicTest {
     @Test
     public void startQuerydsl() {
         // member1 찾기
-        JPAQueryFactory queryFactory = new JPAQueryFactory(em); // Querydsl 사용시 사용하는 객체 지역변수로 생성해도 동시성관리를 해준다 안전함
-        QMember m = new QMember("m");
 
         Member findMember = queryFactory
-                .select(m)
-                .from(m)
-                .where(m.username.eq("member1"))
+                .select(member)
+                .from(member)
+                .where(member.username.eq("member1")) // 파라미터 바인딩 처리
                 .fetchOne();
 
         Assertions.assertThat(findMember.getUsername()).isEqualTo("member1");
