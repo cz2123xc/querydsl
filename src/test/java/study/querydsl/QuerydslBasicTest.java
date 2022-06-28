@@ -13,6 +13,9 @@ import study.querydsl.entity.Team;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.*;
 import static study.querydsl.entity.QMember.*;
 
 @SpringBootTest
@@ -59,7 +62,7 @@ public class QuerydslBasicTest {
                 .setParameter("username", "member1")
                 .getSingleResult();
 
-        Assertions.assertThat(findMember.getUsername()).isEqualTo("member1");
+        assertThat(findMember.getUsername()).isEqualTo("member1");
     }
 
     @Test
@@ -72,9 +75,51 @@ public class QuerydslBasicTest {
                 .where(member.username.eq("member1")) // 파라미터 바인딩 처리
                 .fetchOne();
 
-        Assertions.assertThat(findMember.getUsername()).isEqualTo("member1");
+        assertThat(findMember.getUsername()).isEqualTo("member1");
 
     }
+
+    @Test // where 첫번째 체인 형태
+    public void search() {
+        Member findMember = queryFactory
+                .selectFrom(member)
+                .where(member.username.eq("member1")
+                        .and(member.age.eq(10)))
+                .fetchOne();
+        assertThat(findMember.getUsername()).isEqualTo("member1");
+    }
+
+    @Test // where 두번째 형태(동적쿼리 처리 가능)
+    public void searchAndParam() {
+        List<Member> result1 = queryFactory
+                .selectFrom(member)
+                .where(
+                        member.username.eq("member1"),
+                        member.age.eq(10)
+                )
+                .fetch();
+        assertThat(result1.size()).isEqualTo(1);
+    }
+
+
+
+
+
+
+//        member.username.eq("member1") // username = 'member1'
+//        member.username.ne("member1") //username != 'member1'
+//        member.username.eq("member1").not() // username != 'member1'
+//        member.username.isNotNull() //이름이 is not null
+//        member.age.in(10, 20) // age in (10,20)
+//        member.age.notIn(10, 20) // age not in (10, 20)
+//        member.age.between(10,30) //between 10, 30
+//        member.age.goe(30) // age >= 30
+//        member.age.gt(30) // age > 30
+//        member.age.loe(30) // age <= 30
+//        member.age.lt(30) // age < 30
+//        member.username.like("member%") //like 검색
+//        member.username.contains("member") // like ‘%member%’ 검색
+//        member.username.startsWith("member") //like ‘member%’ 검색
 
 
 
