@@ -2,6 +2,11 @@ package study.querydsl;
 
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.ExpressionUtils;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
@@ -9,9 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
-import study.querydsl.entity.Member;
-import study.querydsl.entity.QMember;
-import study.querydsl.entity.Team;
+import study.querydsl.entity.*;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
@@ -430,7 +433,7 @@ public class QuerydslBasicTest {
                 .select(member.username,
                         select(memberSub.age.avg())
                                 .from(memberSub)
-                        ).from(member)
+                ).from(member)
                 .fetch();
 
         for(Tuple tuple : fetch) {
@@ -455,6 +458,151 @@ public class QuerydslBasicTest {
                 ))
                 .fetch();
     }
+
+    /**
+     * select, 조건절(where), order by 에서 사용 가능
+     */
+    @Test
+    public void userCase() throws Exception {
+        List<String> result = queryFactory
+                .select(member.age
+                        .when(10).then("열살")
+                        .when(20).then("스무살")
+                        .otherwise("기타"))
+                .from(member)
+                .fetch();
+    }
+
+    /**
+     * 복잡한 조건
+     */
+    @Test
+    public void complexCondition() throws Exception {
+        List<String> result = queryFactory
+                .select(new CaseBuilder()
+                        .when(member.age.between(0, 20)).then("0~20살")
+                        .when(member.age.between(21, 30)).then("21~30살")
+                        .otherwise("기타"))
+                .from(member)
+                .fetch();
+    }
+
+    /**
+     * orderBy 에서 Case 문 함께 사용하기 예제
+     */
+    @Test
+    public void orderByCase() throws Exception {
+        NumberExpression<Integer> rankPath = new CaseBuilder()
+                .when(member.age.between(0, 20)).then(2)
+                .when(member.age.between(21, 30)).then(3)
+                .otherwise(3);
+
+        List<Tuple> result = queryFactory
+                .select(member.username, member.age, rankPath)
+                .from(member)
+                .orderBy(rankPath.desc())
+                .fetch();
+
+
+        for(Tuple tuple : result) {
+            String username = tuple.get(member.username);
+            Integer age = tuple.get(member.age);
+            Integer rank = tuple.get(rankPath);
+            System.out.println("username = " + username + ", age = " + age + ", rank = " + rank);
+        }
+    }
+
+    /**
+     * 상수, 문자 더하기
+     */
+
+    @Test
+    public void addConstant() throws Exception {
+        Tuple result = queryFactory
+                .select(member.username, Expressions.constant("A"))
+                .from(member)
+                .fetchFirst();
+    }
+
+    /**
+     * 문자 더하기 concat
+     */
+
+    @Test
+    public void addConcat() throws Exception {
+        String result = queryFactory
+                .select(member.username.concat("_").concat(member.age.stringValue()))
+                .from(member)
+                .where(member.username.eq("member1"))
+                .fetchOne();
+    }
+
+
+    /**
+     * 순수 JPA 에서 DTO 조회 코드
+     */
+    @Test
+    public void jpaDto() throws Exception {
+        List<MemberDto> result = em.createQuery(
+                        "select new study.querydsl.entity.MemberDto(m.username, m.age) from Member m", MemberDto.class)
+                .getResultList();
+    }
+
+    /**
+     * Querydsl 빈 생성(Bean population)
+     * 방법: 프로퍼티 접근, 필드 직접 접근
+     * 생성자 사용
+     */
+    @Test // 프로퍼티 접근
+    public void createBean() throws Exception {
+        List<MemberDto> result = queryFactory
+                .select(Projections.bean(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+    }
+
+    @Test // 필드 직접 접근
+    public void accessField() throws Exception {
+        List<MemberDto> result = queryFactory
+                .select(Projections.fields(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+    }
+
+    @Test // 별칭이 다를때
+    public void differentAka() throws Exception {
+
+        QMember memberSub = new QMember("memberSub");
+
+        List<UserDto> fetch = queryFactory
+                .select(Projections.fields(UserDto.class,
+                                member.username.as("name"),
+                                ExpressionUtils.as(
+                                        JPAExpressions
+                                                .select(memberSub.age.max())
+                                                .from(memberSub), "age")
+                        )
+                ).from(member)
+                .fetch();
+    }
+
+
+    @Test // 생성자 사용
+    public void useConstructor() throws Exception{
+        List<MemberDto> result = queryFactory
+                .select(Projections.constructor(MemberDto.class,
+                        member.username,
+                        member.age))
+                .from(member)
+                .fetch();
+    }
+
+
+
 
 
 
